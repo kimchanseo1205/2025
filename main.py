@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import date, timedelta
+import plotly.express as px
 
 # ✅ 페이지 설정 (가장 위에서 실행)
 st.set_page_config(page_title="시험 공부 계획표", page_icon="📚", layout="wide")
@@ -49,7 +50,7 @@ if st.button("📅 계획 생성"):
     total_weight = sum(s["가중치"] for s in subjects)
 
     # 날짜별 계획 생성
-    max_days = max(["남은일수"] for s in subjects)
+    max_days = max(s["남은일수"] for s in subjects)
     for day_offset in range(max_days):
         current_date = today + timedelta(days=day_offset)
         for s in subjects:
@@ -73,8 +74,10 @@ if st.button("📅 계획 생성"):
     # --- 4. 캘린더 시각화 ---
     st.subheader("📊 캘린더 시각화 (타임라인)")
     if not df.empty:
+        df["날짜"] = pd.to_datetime(df["날짜"])  # ✅ 날짜 변환
         df["시작일"] = df["날짜"]
-        df["종료일"] = df["날짜"] + timedelta(days=1)  # 하루 단위
+        df["종료일"] = df["날짜"] + pd.Timedelta(days=1)  # ✅ Timedelta 사용
+
         fig = px.timeline(
             df,
             x_start="시작일",
