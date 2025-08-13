@@ -1,8 +1,9 @@
 import streamlit as st
 import pandas as pd
 from datetime import date, timedelta
+import plotly.express as px
 
-st.set_page_config(page_title="시험 공부 계획표", page_icon="📚")
+st.set_page_config(page_title="시험 공부 계획표", page_icon="📚", layout="wide")
 st.title("📚 시험 공부 계획 자동 생성기")
 
 # --- 1. 시험 일정 입력 ---
@@ -68,7 +69,22 @@ if st.button("📅 계획 생성"):
     st.subheader("📆 생성된 공부 계획")
     st.dataframe(df)
 
-    # CSV 다운로드
+    # --- 4. 캘린더 시각화 ---
+    st.subheader("📊 캘린더 시각화 (타임라인)")
+    if not df.empty:
+        fig = px.timeline(
+            df,
+            x_start="날짜",
+            x_end="날짜",
+            y="과목",
+            color="과목",
+            text="공부시간(시간)",
+            title="시험 공부 계획 타임라인"
+        )
+        fig.update_yaxes(categoryorder="category ascending")
+        fig.update_traces(marker=dict(line=dict(width=1, color='DarkSlateGrey')))
+        st.plotly_chart(fig, use_container_width=True)
+
+    # --- 5. CSV 다운로드 ---
     csv = df.to_csv(index=False).encode('utf-8-sig')
     st.download_button("📥 계획 다운로드 (CSV)", csv, "study_plan.csv", "text/csv")
-
