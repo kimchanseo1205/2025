@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 from datetime import date, timedelta
-import plotly.express as px
 
 # ✅ 페이지 설정 (가장 위에서 실행)
 st.set_page_config(page_title="시험 공부 계획표", page_icon="📚", layout="wide")
