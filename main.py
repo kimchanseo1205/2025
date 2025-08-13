@@ -49,7 +49,6 @@ if st.button("📅 계획 생성"):
     total_weight = sum(s["가중치"] for s in subjects)
 
     # 날짜별 계획 생성
-    
     max_days = max(s["남은일수"] for s in subjects)
     for day_offset in range(max_days):
         current_date = today + timedelta(days=day_offset)
