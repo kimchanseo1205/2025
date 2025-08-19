@@ -3,8 +3,11 @@ import pandas as pd
 from datetime import date, timedelta
 import plotly.express as px
 
-# ✅ 페이지 설정 (아이콘 제거)
-st.set_page_config(page_title="시험 공부 계획표", layout="wide")
+# ✅ 페이지 설정 (가장 먼저, 아이콘 제거 → 오류 방지)
+st.set_page_config(
+    page_title="시험 공부 계획표",
+    layout="wide"
+)
 
 st.title("📚 시험 공부 계획 자동 생성기")
 
@@ -42,7 +45,7 @@ if st.button("📅 계획 생성"):
     # 과목별 가중치 계산 (시험일 가까움 + 중요도)
     for s in subjects:
         if s["남은일수"] > 0:
-            urgency_score = 1 / s["남은일수"]  # 가까울수록 큼
+            urgency_score = 1 / s["남은일수"]  # 가까울수록 점수 ↑
             s["가중치"] = urgency_score * 0.5 + (s["중요도"] / 5) * 0.5
         else:
             s["가중치"] = 0
@@ -50,7 +53,7 @@ if st.button("📅 계획 생성"):
     total_weight = sum(s["가중치"] for s in subjects)
 
     # 날짜별 계획 생성
-    max_days = max(s["남은일수"] for s in subjects)
+    max_days = max(s["남은일수"] for s in subjects) if subjects else 0
     for day_offset in range(max_days):
         current_date = today + timedelta(days=day_offset)
         for s in subjects:
@@ -92,5 +95,7 @@ if st.button("📅 계획 생성"):
         st.plotly_chart(fig, use_container_width=True)
 
     # --- 5. CSV 다운로드 ---
-    csv = df.to_csv(index=False).encode('utf-8-sig')
-    st.download_button("📥 계획 다운로드 (CSV)", csv, "study_plan.csv", "text/csv")
+    if not df.empty:
+        csv = df.to_csv(index=False).encode('utf-8-sig')
+        st.download_button("📥 계획 다운로드 (CSV)", csv, "study_plan.csv", "text/csv")
+
