@@ -3,8 +3,8 @@ import pandas as pd
 from datetime import date, timedelta
 import plotly.express as px
 
-# ✅ 페이지 설정 (가장 위에서 실행)
-st.set_page_config(page_title="시험 공부 계획표", page_icon="📚", layout="wide")
+# ✅ 페이지 설정 (아이콘 제거)
+st.set_page_config(page_title="시험 공부 계획표", layout="wide")
 
 st.title("📚 시험 공부 계획 자동 생성기")
 
@@ -76,7 +76,7 @@ if st.button("📅 계획 생성"):
     if not df.empty:
         df["날짜"] = pd.to_datetime(df["날짜"])  # ✅ 날짜 변환
         df["시작일"] = df["날짜"]
-        df["종료일"] = df["날짜"] + pd.Timedelta(days=1)  # ✅ Timedelta 사용
+        df["종료일"] = df["날짜"] + pd.Timedelta(days=1)  # ✅ 하루 단위
 
         fig = px.timeline(
             df,
