@@ -1,13 +1,10 @@
 import streamlit as st
 import pandas as pd
 from datetime import date, timedelta
-import plotly.express as px
+import altair as alt
 
-# ✅ 페이지 설정 (가장 먼저, 아이콘 제거 → 오류 방지)
-st.set_page_config(
-    page_title="시험 공부 계획표",
-    layout="wide"
-)
+# ✅ 페이지 설정
+st.set_page_config(page_title="시험 공부 계획표", layout="wide")
 
 st.title("📚 시험 공부 계획 자동 생성기")
 
@@ -74,28 +71,19 @@ if st.button("📅 계획 생성"):
     st.subheader("📆 생성된 공부 계획")
     st.dataframe(df)
 
-    # --- 4. 캘린더 시각화 ---
-    st.subheader("📊 캘린더 시각화 (타임라인)")
+    # --- 4. 시각화 (Altair로 색깔별 과목 표시) ---
+    st.subheader("📊 과목별 공부 계획 시각화")
     if not df.empty:
-        df["날짜"] = pd.to_datetime(df["날짜"])  # ✅ 날짜 변환
-        df["시작일"] = df["날짜"]
-        df["종료일"] = df["날짜"] + pd.Timedelta(days=1)  # ✅ 하루 단위
+        chart = alt.Chart(df).mark_bar().encode(
+            x="날짜:T",
+            y="공부시간(시간):Q",
+            color="과목:N",
+            tooltip=["날짜", "과목", "공부시간(시간)"]
+        ).properties(width=700, height=400)
 
-        fig = px.timeline(
-            df,
-            x_start="시작일",
-            x_end="종료일",
-            y="과목",
-            color="과목",
-            text="공부시간(시간)",
-            title="시험 공부 계획 타임라인"
-        )
-        fig.update_yaxes(categoryorder="category ascending")
-        fig.update_traces(marker=dict(line=dict(width=1, color='DarkSlateGrey')))
-        st.plotly_chart(fig, use_container_width=True)
+        st.altair_chart(chart, use_container_width=True)
 
     # --- 5. CSV 다운로드 ---
     if not df.empty:
         csv = df.to_csv(index=False).encode('utf-8-sig')
         st.download_button("📥 계획 다운로드 (CSV)", csv, "study_plan.csv", "text/csv")
-
