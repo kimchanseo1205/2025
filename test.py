@@ -1,96 +1,74 @@
 import streamlit as st
+
+# 반드시 가장 먼저 실행
+st.set_page_config(page_title="하루 공부 & 복습 계획 짜기", layout="wide")
+
 import pandas as pd
-from datetime import date, timedelta
-import plotly.express as px
+import altair as alt
+import random
+import math
 
-# ✅ 페이지 설정 (가장 위에서 실행)
-st.set_page_config(page_title="시험 공부 계획표", page_icon="📚", layout="wide")
+st.title("📚 하루 공부 & 복습 계획 짜기")
 
-st.title("📚 시험 공부 계획 자동 생성기")
+# 과목 목록
+subjects = ["생활과윤리", "한국지리", "정치와법", "심화국어",
+            "생활과 과학", "국어", "영어", "수학"]
 
-# --- 1. 시험 일정 입력 ---
-st.header("1. 과목별 시험 일정 입력")
-subjects = []
-num_subjects = st.number_input("시험 과목 수", min_value=1, value=3, step=1)
+# ---- 사이드바 설정 ----
+st.sidebar.header("설정")
+total_hours = st.sidebar.number_input("총 공부 시간 (시간)", 1, 24, 8)
 
-for i in range(num_subjects):
-    with st.expander(f"과목 {i+1} 입력"):
-        subject = st.text_input(f"{i+1}번 과목명", key=f"sub_{i}")
-        exam_date = st.date_input(f"{subject or '과목'} 시험 날짜", min_value=date.today(), key=f"date_{i}")
-        importance = st.slider(f"{subject or '과목'} 중요도 (1=낮음, 5=높음)", 1, 5, 3, key=f"imp_{i}")
-        if subject:
-            subjects.append({
-                "과목": subject,
-                "시험일": exam_date,
-                "중요도": importance
-            })
+st.sidebar.subheader("과목별 비중 (가중치)")
+weights = {subj: st.sidebar.slider(f"{subj}", 1, 5, 1) for subj in subjects}
+weight_sum = sum(weights.values())
 
-# --- 2. 하루 공부 가능 시간 ---
-st.header("2. 하루 공부 가능 시간 입력")
-daily_hours = st.number_input("하루 공부 가능 시간 (시간)", min_value=1, value=4, step=1)
+# ---- 오늘 공부 계획 ----
+df_today = pd.DataFrame([
+    {"과목": s, "공부시간(시간)": round(total_hours * (weights[s]/weight_sum), 2)}
+    for s in subjects
+])
 
-# --- 3. 계획 생성 ---
-if st.button("📅 계획 생성"):
-    today = date.today()
-    plan = []
+st.subheader("📋 오늘의 공부 계획")
+st.dataframe(df_today, use_container_width=True)
 
-    # 시험일까지 남은 일수 계산
-    for s in subjects:
-        days_left = (s["시험일"] - today).days
-        s["남은일수"] = max(days_left, 0)
+# 오늘 공부 비율 (도넛차트)
+pie = (
+    alt.Chart(df_today)
+    .mark_arc(innerRadius=40)
+    .encode(
+        theta=alt.Theta("공부시간(시간):Q"),
+        color=alt.Color("과목:N"),
+        tooltip=["과목", "공부시간(시간)"]
+    )
+)
+st.altair_chart(pie, use_container_width=True)
 
-    # 과목별 가중치 계산 (시험일 가까움 + 중요도)
-    for s in subjects:
-        if s["남은일수"] > 0:
-            urgency_score = 1 / s["남은일수"]  # 가까울수록 큼
-            s["가중치"] = urgency_score * 0.5 + (s["중요도"] / 5) * 0.5
-        else:
-            s["가중치"] = 0
+# ---- 내일 복습 계획 ----
+st.subheader("🔄 내일의 복습 계획")
 
-    total_weight = sum(s["가중치"] for s in subjects)
+pick_k = max(1, math.floor(len(subjects)/2))  # 과목 절반 선택
+subjects_to_review = random.sample(subjects, k=pick_k)
 
-    # 날짜별 계획 생성
-    max_days = max(s["남은일수"] for s in subjects)
-    for day_offset in range(max_days):
-        current_date = today + timedelta(days=day_offset)
-        for s in subjects:
-            if day_offset < s["남은일수"]:
-                if total_weight > 0:
-                    hours = round((s["가중치"] / total_weight) * daily_hours, 2)
-                else:
-                    hours = 0
-                if hours > 0:
-                    plan.append({
-                        "날짜": current_date,
-                        "과목": s["과목"],
-                        "공부시간(시간)": hours
-                    })
-
-    # DataFrame 변환
-    df = pd.DataFrame(plan)
-    st.subheader("📆 생성된 공부 계획")
-    st.dataframe(df)
-
-    # --- 4. 캘린더 시각화 ---
-    st.subheader("📊 캘린더 시각화 (타임라인)")
-    if not df.empty:
-        df["날짜"] = pd.to_datetime(df["날짜"])  # ✅ 날짜 변환
-        df["시작일"] = df["날짜"]
-        df["종료일"] = df["날짜"] + pd.Timedelta(days=1)  # ✅ Timedelta 사용
-
-        fig = px.timeline(
-            df,
-            x_start="시작일",
-            x_end="종료일",
-            y="과목",
-            color="과목",
-            text="공부시간(시간)",
-            title="시험 공부 계획 타임라인"
+df_review = pd.DataFrame([
+    {
+        "과목": s,
+        "복습시간(시간)": round(
+            df_today.loc[df_today["과목"] == s, "공부시간(시간)"].values[0] * 0.5, 2
         )
-        fig.update_yaxes(categoryorder="category ascending")
-        fig.update_traces(marker=dict(line=dict(width=1, color='DarkSlateGrey')))
-        st.plotly_chart(fig, use_container_width=True)
+    }
+    for s in subjects_to_review
+])
 
-    # --- 5. CSV 다운로드 ---
-    csv = df.to_csv(index=False).encode('utf-8-sig')
-    st.download_button("📥 계획 다운로드 (CSV)", csv, "study_plan.csv", "text/csv")
+st.dataframe(df_review, use_container_width=True)
+
+# 복습 계획 막대그래프
+bar = (
+    alt.Chart(df_review)
+    .mark_bar()
+    .encode(
+        x=alt.X("과목:N", sort="-y"),
+        y="복습시간(시간):Q",
+        tooltip=["과목", "복습시간(시간)"]
+    )
+)
+st.altair_chart(bar, use_container_width=True)
