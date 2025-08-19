@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
+import altair as alt
 import random
 
 st.set_page_config(page_title="하루 공부 계획 앱", layout="wide")
