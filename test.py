@@ -3,25 +3,30 @@ import pandas as pd
 import calendar
 from datetime import date, timedelta
 
-st.set_page_config(page_title="시험 공부 계획표", layout="wide")
-st.title("📚 시험 공부 계획 자동 생성기")
+# -------------------------
+# 기본 설정
+# -------------------------
+st.set_page_config(page_title="📘 시험 공부 계획 앱", layout="wide")
 
-# --- 1. 과목 입력 ---
-st.header("1. 과목별 시험 정보 입력")
+st.title("📘 시험 공부 계획 자동 생성기")
+st.write("시험 범위를 입력하면 자동으로 하루 공부량과 복습 계획을 나눠줍니다!")
+
+# -------------------------
+# 입력 섹션
+# -------------------------
+st.sidebar.header("과목 입력")
+
+num_subjects = st.sidebar.number_input("과목 개수", 1, 10, 3)
 subjects = []
-num_subjects = st.number_input("시험 과목 수", min_value=1, value=3, step=1)
 
 for i in range(num_subjects):
-    with st.expander(f"과목 {i+1} 입력"):
+    with st.sidebar.expander(f"과목 {i+1} 입력"):
         subject = st.text_input(f"{i+1}번 과목명", key=f"sub_{i}")
-        publisher = st.text_input(f"{subject or '과목'} 교과서 출판사", key=f"pub_{i}")
-        unit = st.text_input(f"{subject or '과목'} 단원명", key=f"unit_{i}")
-        exam_date = st.date_input(f"{subject or '과목'} 시험 날짜", min_value=date.today(), key=f"date_{i}")
-        importance = st.slider(f"{subject or '과목'} 중요도 (1=낮음, 5=높음)", 1, 5, 3, key=f"imp_{i}")
-        
-        st.markdown("시험범위 (예: p.1~50, 문제 1~30)")
-        start = st.text_input(f"{subject} 시작 범위", key=f"start_{i}")
-        end = st.text_input(f"{subject} 끝 범위", key=f"end_{i}")
+        publisher = st.text_input("교과서 출판사", key=f"pub_{i}")
+        unit = st.text_input("단원명", key=f"unit_{i}")
+        exam_date = st.date_input("시험 날짜", min_value=date.today(), key=f"date_{i}")
+        start = st.text_input("범위 시작 (예: p.1, 1번)", key=f"start_{i}")
+        end = st.text_input("범위 끝 (예: p.150, 200번)", key=f"end_{i}")
 
         if subject:
             subjects.append({
@@ -29,122 +34,139 @@ for i in range(num_subjects):
                 "출판사": publisher,
                 "단원": unit,
                 "시험일": exam_date,
-                "중요도": importance,
                 "범위시작": start,
                 "범위끝": end
             })
 
-# --- 2. 하루 공부 가능 시간 ---
-st.header("2. 하루 공부 가능 시간 입력")
-daily_hours = st.number_input("하루 공부 가능 시간 (시간)", min_value=1, value=4, step=1)
+daily_hours = st.sidebar.slider("하루 총 공부시간(시간)", 1, 12, 6)
 
-# --- 3. 계획 생성 ---
-if st.button("📅 계획 생성"):
-    today = date.today()
-    plan = []
+# -------------------------
+# 범위 파싱 함수
+# -------------------------
+def parse_range(start, end):
+    """범위 문자열에서 숫자 추출"""
+    try:
+        start_num = int(''.join(filter(str.isdigit, start)))
+        end_num = int(''.join(filter(str.isdigit, end)))
+        return start_num, end_num, start[0]
+    except:
+        return None, None, ""
 
+# -------------------------
+# 계획 생성
+# -------------------------
+plan = []
+today = date.today()
+
+if st.sidebar.button("📅 공부 계획 세우기"):
     for s in subjects:
         days_left = (s["시험일"] - today).days
-        s["남은일수"] = max(days_left, 0)
+        if days_left <= 0:
+            continue
 
-        if s["남은일수"] > 0:
-            # 하루 분량을 "시작~끝" 숫자가 아니라 단순 반복으로 처리
-            for d in range(s["남은일수"]):
-                current_date = today + timedelta(days=d)
+        start_num, end_num, prefix = parse_range(s["범위시작"], s["범위끝"])
+        if not start_num or not end_num:
+            continue
 
-                # 본공부 일정
-                plan.append({
-                    "날짜": current_date,
-                    "과목": s["과목"],
-                    "출판사": s["출판사"],
-                    "단원": s["단원"],
-                    "범위": f"{s['범위시작']} ~ {s['범위끝']}",
-                    "종류": "공부",
-                    "예상시간(h)": round(daily_hours / num_subjects, 1)
-                })
+        total_amount = end_num - start_num + 1
+        daily_amount = total_amount // days_left
 
-                # 복습 일정 자동 생성 (+1, +3, +7일)
-                for offset in [1, 3, 7]:
-                    review_date = current_date + timedelta(days=offset)
-                    if review_date <= s["시험일"]:  
-                        plan.append({
-                            "날짜": review_date,
-                            "과목": s["과목"],
-                            "출판사": s["출판사"],
-                            "단원": s["단원"],
-                            "범위": f"{s['범위시작']} ~ {s['범위끝']}",
-                            "종류": f"복습(D+{offset})",
-                            "예상시간(h)": round(daily_hours / num_subjects / 2, 1)
-                        })
+        for d in range(days_left):
+            current_date = today + timedelta(days=d)
+            part_start = start_num + d * daily_amount
+            part_end = part_start + daily_amount - 1
+            if d == days_left - 1:  # 마지막 날은 남은 범위 몰아주기
+                part_end = end_num
 
-    df = pd.DataFrame(plan).sort_values(by=["날짜", "과목"])
+            task = {
+                "날짜": current_date,
+                "과목": s["과목"],
+                "출판사": s["출판사"],
+                "단원": s["단원"],
+                "범위": f"{prefix}{part_start} ~ {prefix}{part_end}",
+                "종류": "공부",
+                "예상시간(h)": round(daily_hours / num_subjects, 1)
+            }
+            plan.append(task)
 
-    # --- 4. 오늘의 계획 체크리스트 ---
-    st.subheader("✅ 오늘 공부 체크리스트")
-    today_plan = df[df["날짜"] == pd.Timestamp(today)]
-    done_count = 0
+            # 복습 일정 추가 (D+1, D+3, D+7)
+            for offset in [1, 3, 7]:
+                review_date = current_date + timedelta(days=offset)
+                if review_date <= s["시험일"]:
+                    plan.append({
+                        "날짜": review_date,
+                        "과목": s["과목"],
+                        "출판사": s["출판사"],
+                        "단원": s["단원"],
+                        "범위": f"{prefix}{part_start} ~ {prefix}{part_end}",
+                        "종류": f"복습(D+{offset})",
+                        "예상시간(h)": round(daily_hours / num_subjects / 2, 1)
+                    })
 
-    if not today_plan.empty:
+    # -------------------------
+    # DataFrame으로 변환
+    # -------------------------
+    df = pd.DataFrame(plan)
+    df = df.sort_values(by=["날짜", "과목"])
+
+    # -------------------------
+    # 오늘 할 공부
+    # -------------------------
+    st.subheader("📌 오늘 할 공부")
+    today_plan = df[df["날짜"] == today]
+
+    if today_plan.empty:
+        st.info("오늘은 계획된 공부가 없습니다! 😴")
+    else:
+        done_count = 0
         for i, row in today_plan.iterrows():
-            checked = st.checkbox(
-                f"[{row['과목']} - {row['출판사']}] {row['단원']} / {row['범위']} ({row['종류']}, {row['예상시간(h)']}h)",
-                key=f"check_{i}"
+            done = st.checkbox(
+                f"[{row['과목']}({row['출판사']}) {row['단원']} - {row['범위']} ({row['종류']})",
+                key=f"done_{i}"
             )
-            if checked:
+            if done:
+                st.success("완료 ✅")
                 done_count += 1
 
-        progress = done_count / len(today_plan)
-        st.progress(progress)
-        st.write(f"오늘 계획 달성률: **{int(progress*100)}%**")
-    else:
-        st.info("오늘은 특별히 배정된 공부 계획이 없습니다!")
+        st.write(f"진행률: {done_count} / {len(today_plan)} 완료")
 
-    # --- 5. 전체 계획표 ---
-    st.subheader("📆 전체 공부 계획표")
-    st.dataframe(df)
+    # -------------------------
+    # 전체 계획 테이블
+    # -------------------------
+    st.subheader("📖 전체 계획표")
+    st.dataframe(df, use_container_width=True)
 
-    # --- 6. 달력 출력 ---
-    st.subheader("📊 달력형 계획표")
-    if not df.empty:
-        start_month, start_year = today.month, today.year
-        end_date = df["날짜"].max()
-        end_month, end_year = end_date.month, end_date.year
+    # -------------------------
+    # 달력 시각화
+    # -------------------------
+    st.subheader("📅 달력 시각화")
 
-        current_year, current_month = start_year, start_month
-        while (current_year < end_year) or (current_year == end_year and current_month <= end_month):
-            st.markdown(f"### {current_year}년 {current_month}월")
-            cal = calendar.Calendar(firstweekday=6)
-            month_days = cal.monthdatescalendar(current_year, current_month)
+    def make_calendar(year, month, df):
+        cal = calendar.Calendar()
+        month_days = cal.itermonthdates(year, month)
+        events = df[df["날짜"].between(date(year, month, 1), date(year, month, 28))]
 
-            table = "<table style='border-collapse: collapse; width: 100%;'>"
-            table += "<tr>" + "".join([f"<th style='border:1px solid #ccc; padding:4px; text-align:center;'>{d}</th>" for d in ["일","월","화","수","목","금","토"]]) + "</tr>"
+        html = "<table style='border-collapse: collapse; width: 100%; text-align: center;'>"
+        html += "<tr>" + "".join([f"<th>{d}</th>" for d in ["월", "화", "수", "목", "금", "토", "일"]]) + "</tr><tr>"
 
-            for week in month_days:
-                table += "<tr>"
-                for day in week:
-                    cell_content = f"<div style='font-weight:bold;'>{day.day}</div>"
-                    daily = df[df["날짜"] == pd.Timestamp(day)]
-                    if not daily.empty:
-                        for _, row in daily.iterrows():
-                            color = "#e3f2fd" if row["종류"] == "공부" else "#ffe0b2"
-                            cell_content += f"<div style='font-size:12px; background:{color}; margin:2px; padding:2px; border-radius:4px;'>{row['과목']} ({row['출판사']})<br>{row['단원']}<br>{row['종류']} [{row['범위']}]</div>"
-                    style = "border:1px solid #ccc; vertical-align:top; padding:4px; height:120px;"
-                    if day.month != current_month:
-                        style += "background:#f0f0f0; color:#aaa;"
-                    table += f"<td style='{style}'>{cell_content}</td>"
-                table += "</tr>"
-
-            table += "</table>"
-            st.markdown(table, unsafe_allow_html=True)
-
-            # 다음 달 이동
-            if current_month == 12:
-                current_month = 1
-                current_year += 1
+        week_day = 0
+        for day in month_days:
+            if day.month != month:
+                html += "<td style='padding:10px; background:#f0f0f0;'></td>"
             else:
-                current_month += 1
+                tasks = events[events["날짜"] == day]
+                content = f"<b>{day.day}</b><br>"
+                for _, t in tasks.iterrows():
+                    color = "#a3c9f7" if t["종류"] == "공부" else "#f7b3c9"
+                    content += f"<div style='background:{color}; border-radius:5px; margin:2px; padding:2px; font-size:10px'>{t['과목']}</div>"
+                html += f"<td style='padding:10px; vertical-align:top;'>{content}</td>"
 
-    # --- 7. CSV 다운로드 ---
-    if not df.empty:
-        csv = df.to_csv(index=False).encode('utf-8-sig')
-        st.download_button("📥 계획 다운로드 (CSV)", csv, "study_plan.csv", "text/csv")
+            week_day += 1
+            if week_day == 7:
+                html += "</tr><tr>"
+                week_day = 0
+        html += "</tr></table>"
+        return html
+
+    month_html = make_calendar(today.year, today.month, df)
+    st.markdown(month_html, unsafe_allow_html=True)
