@@ -14,16 +14,20 @@ num_subjects = st.number_input("시험 과목 수", min_value=1, value=3, step=1
 for i in range(num_subjects):
     with st.expander(f"과목 {i+1} 입력"):
         subject = st.text_input(f"{i+1}번 과목명", key=f"sub_{i}")
+        publisher = st.text_input(f"{subject or '과목'} 교과서 출판사", key=f"pub_{i}")
+        unit = st.text_input(f"{subject or '과목'} 단원명", key=f"unit_{i}")
         exam_date = st.date_input(f"{subject or '과목'} 시험 날짜", min_value=date.today(), key=f"date_{i}")
         importance = st.slider(f"{subject or '과목'} 중요도 (1=낮음, 5=높음)", 1, 5, 3, key=f"imp_{i}")
         
-        st.markdown("시험범위 (예: 1~50쪽, 1~100문제)")
-        start = st.number_input(f"{subject} 시작 번호", min_value=1, value=1, key=f"start_{i}")
-        end = st.number_input(f"{subject} 끝 번호", min_value=start, value=start+10, key=f"end_{i}")
+        st.markdown("시험범위 (예: p.1~50, 문제 1~30)")
+        start = st.text_input(f"{subject} 시작 범위", key=f"start_{i}")
+        end = st.text_input(f"{subject} 끝 범위", key=f"end_{i}")
 
         if subject:
             subjects.append({
                 "과목": subject,
+                "출판사": publisher,
+                "단원": unit,
                 "시험일": exam_date,
                 "중요도": importance,
                 "범위시작": start,
@@ -43,40 +47,34 @@ if st.button("📅 계획 생성"):
         days_left = (s["시험일"] - today).days
         s["남은일수"] = max(days_left, 0)
 
-        total_range = s["범위끝"] - s["범위시작"] + 1
         if s["남은일수"] > 0:
-            per_day = total_range // s["남은일수"]
-            extra = total_range % s["남은일수"]
-
-            start_point = s["범위시작"]
+            # 하루 분량을 "시작~끝" 숫자가 아니라 단순 반복으로 처리
             for d in range(s["남은일수"]):
                 current_date = today + timedelta(days=d)
-                # 범위 분배
-                day_start = start_point
-                day_end = start_point + per_day - 1
-                if d < extra:  # 나머지 분배
-                    day_end += 1
-                start_point = day_end + 1
 
                 # 본공부 일정
                 plan.append({
                     "날짜": current_date,
                     "과목": s["과목"],
-                    "범위": f"{day_start}~{day_end}",
+                    "출판사": s["출판사"],
+                    "단원": s["단원"],
+                    "범위": f"{s['범위시작']} ~ {s['범위끝']}",
                     "종류": "공부",
                     "예상시간(h)": round(daily_hours / num_subjects, 1)
                 })
 
-                # 복습 일정 추가 (+1, +3, +7일 뒤)
+                # 복습 일정 자동 생성 (+1, +3, +7일)
                 for offset in [1, 3, 7]:
                     review_date = current_date + timedelta(days=offset)
-                    if review_date <= s["시험일"]:  # 시험 전까지만
+                    if review_date <= s["시험일"]:  
                         plan.append({
                             "날짜": review_date,
                             "과목": s["과목"],
-                            "범위": f"{day_start}~{day_end}",
+                            "출판사": s["출판사"],
+                            "단원": s["단원"],
+                            "범위": f"{s['범위시작']} ~ {s['범위끝']}",
                             "종류": f"복습(D+{offset})",
-                            "예상시간(h)": round(daily_hours / num_subjects / 2, 1)  # 복습은 절반 시간
+                            "예상시간(h)": round(daily_hours / num_subjects / 2, 1)
                         })
 
     df = pd.DataFrame(plan).sort_values(by=["날짜", "과목"])
@@ -88,7 +86,10 @@ if st.button("📅 계획 생성"):
 
     if not today_plan.empty:
         for i, row in today_plan.iterrows():
-            checked = st.checkbox(f"{row['과목']} ({row['종류']}) - {row['범위']} (예상 {row['예상시간(h)']}h)", key=f"check_{i}")
+            checked = st.checkbox(
+                f"[{row['과목']} - {row['출판사']}] {row['단원']} / {row['범위']} ({row['종류']}, {row['예상시간(h)']}h)",
+                key=f"check_{i}"
+            )
             if checked:
                 done_count += 1
 
@@ -126,8 +127,8 @@ if st.button("📅 계획 생성"):
                     if not daily.empty:
                         for _, row in daily.iterrows():
                             color = "#e3f2fd" if row["종류"] == "공부" else "#ffe0b2"
-                            cell_content += f"<div style='font-size:12px; background:{color}; margin:2px; padding:2px; border-radius:4px;'>{row['과목']} {row['종류']} ({row['범위']})</div>"
-                    style = "border:1px solid #ccc; vertical-align:top; padding:4px; height:100px;"
+                            cell_content += f"<div style='font-size:12px; background:{color}; margin:2px; padding:2px; border-radius:4px;'>{row['과목']} ({row['출판사']})<br>{row['단원']}<br>{row['종류']} [{row['범위']}]</div>"
+                    style = "border:1px solid #ccc; vertical-align:top; padding:4px; height:120px;"
                     if day.month != current_month:
                         style += "background:#f0f0f0; color:#aaa;"
                     table += f"<td style='{style}'>{cell_content}</td>"
