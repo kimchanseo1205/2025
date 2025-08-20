@@ -58,18 +58,51 @@ if st.button("📅 계획 생성"):
                     day_end += 1
                 start_point = day_end + 1
 
+                # 본공부 일정
                 plan.append({
                     "날짜": current_date,
                     "과목": s["과목"],
                     "범위": f"{day_start}~{day_end}",
+                    "종류": "공부",
                     "예상시간(h)": round(daily_hours / num_subjects, 1)
                 })
 
-    df = pd.DataFrame(plan)
-    st.subheader("📆 생성된 공부 계획표")
+                # 복습 일정 추가 (+1, +3, +7일 뒤)
+                for offset in [1, 3, 7]:
+                    review_date = current_date + timedelta(days=offset)
+                    if review_date <= s["시험일"]:  # 시험 전까지만
+                        plan.append({
+                            "날짜": review_date,
+                            "과목": s["과목"],
+                            "범위": f"{day_start}~{day_end}",
+                            "종류": f"복습(D+{offset})",
+                            "예상시간(h)": round(daily_hours / num_subjects / 2, 1)  # 복습은 절반 시간
+                        })
+
+    df = pd.DataFrame(plan).sort_values(by=["날짜", "과목"])
+
+    # --- 4. 오늘의 계획 체크리스트 ---
+    st.subheader("✅ 오늘 공부 체크리스트")
+    today_plan = df[df["날짜"] == pd.Timestamp(today)]
+    done_count = 0
+
+    if not today_plan.empty:
+        for i, row in today_plan.iterrows():
+            checked = st.checkbox(f"{row['과목']} ({row['종류']}) - {row['범위']} (예상 {row['예상시간(h)']}h)", key=f"check_{i}")
+            if checked:
+                done_count += 1
+
+        progress = done_count / len(today_plan)
+        st.progress(progress)
+        st.write(f"오늘 계획 달성률: **{int(progress*100)}%**")
+    else:
+        st.info("오늘은 특별히 배정된 공부 계획이 없습니다!")
+
+    # --- 5. 전체 계획표 ---
+    st.subheader("📆 전체 공부 계획표")
     st.dataframe(df)
 
-    # --- 4. 달력 출력 ---
+    # --- 6. 달력 출력 ---
     st.subheader("📊 달력형 계획표")
     if not df.empty:
         start_month, start_year = today.month, today.year
@@ -92,7 +125,8 @@ if st.button("📅 계획 생성"):
                     daily = df[df["날짜"] == pd.Timestamp(day)]
                     if not daily.empty:
                         for _, row in daily.iterrows():
-                            cell_content += f"<div style='font-size:12px; background:#e3f2fd; margin:2px; padding:2px; border-radius:4px;'>{row['과목']} ({row['범위']})</div>"
+                            color = "#e3f2fd" if row["종류"] == "공부" else "#ffe0b2"
+                            cell_content += f"<div style='font-size:12px; background:{color}; margin:2px; padding:2px; border-radius:4px;'>{row['과목']} {row['종류']} ({row['범위']})</div>"
                     style = "border:1px solid #ccc; vertical-align:top; padding:4px; height:100px;"
                     if day.month != current_month:
                         style += "background:#f0f0f0; color:#aaa;"
@@ -109,7 +143,7 @@ if st.button("📅 계획 생성"):
             else:
                 current_month += 1
 
-    # --- 5. CSV 다운로드 ---
+    # --- 7. CSV 다운로드 ---
     if not df.empty:
         csv = df.to_csv(index=False).encode('utf-8-sig')
         st.download_button("📥 계획 다운로드 (CSV)", csv, "study_plan.csv", "text/csv")
