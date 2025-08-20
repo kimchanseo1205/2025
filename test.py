@@ -1,6 +1,13 @@
+import streamlit as st
+import pandas as pd
+from datetime import date, timedelta
+
 # ==============================
-# 스타일 꾸미기 (CSS + 배경 이미지)
+# 페이지 설정 + 스타일
 # ==============================
+st.set_page_config(page_title="시험 공부 계획표", layout="wide")
+
+# 배경 이미지 + 카드 스타일
 page_bg_img = """
 <style>
 [data-testid="stAppViewContainer"] {
@@ -15,27 +22,18 @@ page_bg_img = """
 }
 
 .block-container {
-  background: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.85);
   padding: 2rem;
   border-radius: 20px;
   box-shadow: 0 4px 15px rgba(0,0,0,0.2);
 }
 </style>
 """
-
 st.markdown(page_bg_img, unsafe_allow_html=True)
 
-import streamlit as st
-import pandas as pd
-from datetime import date, timedelta
-
-# ==============================
-# Streamlit 앱 기본 설정
-# ==============================
-st.set_page_config(page_title="시험 공부 계획표", layout="wide")
-
+# 제목
 st.title("📚 시험 공부 계획 앱")
-st.write("시험 범위를 입력하면 자동으로 공부량을 분배하고, 복습까지 포함한 일정을 만들어 드립니다.")
+st.write("시험 범위를 입력하면 **자동 분배 + 복습 일정 + 오늘 할 공부**까지 보여주는 앱입니다.")
 
 # ==============================
 # 유틸 함수
@@ -173,6 +171,10 @@ if st.sidebar.button("📅 공부 계획 세우기") and subjects:
     # 전체 계획표
     st.subheader("📖 전체 계획표")
     st.dataframe(df, use_container_width=True)
+
+    # 공부 다 끝내면 축하
+    if not today_plan.empty and done_count == len(today_plan):
+        st.balloons()
 
 else:
     st.info("왼쪽에서 과목과 시험 범위를 입력하고 [📅 공부 계획 세우기] 버튼을 눌러주세요.")
