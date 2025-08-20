@@ -1,3 +1,30 @@
+# ==============================
+# 스타일 꾸미기 (CSS + 배경 이미지)
+# ==============================
+page_bg_img = """
+<style>
+[data-testid="stAppViewContainer"] {
+  background-image: url("https://images.unsplash.com/photo-1523050854058-8df90110c9f1");
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+}
+
+[data-testid="stHeader"] {
+  background: rgba(0,0,0,0);
+}
+
+.block-container {
+  background: rgba(255, 255, 255, 0.8);
+  padding: 2rem;
+  border-radius: 20px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+</style>
+"""
+
+st.markdown(page_bg_img, unsafe_allow_html=True)
+
 import streamlit as st
 import pandas as pd
 from datetime import date, timedelta
