@@ -3,35 +3,30 @@ import pandas as pd
 from datetime import date, timedelta
 
 # ==============================
-# 페이지 설정 + 스타일
+# 페이지 설정 + 배경 이미지
 # ==============================
 st.set_page_config(page_title="시험 공부 계획표", layout="wide")
 
-# 배경 이미지 + 카드 스타일
-page_bg_img = """
-<style>
-[data-testid="stAppViewContainer"] {
-  background-image: url("https://images.unsplash.com/photo-1523050854058-8df90110c9f1");
-  background-size: cover;
-  background-position: center;
-  background-attachment: fixed;
-}
+st.markdown(
+    f"""
+    <style>
+    body {{
+        background-image: url("https://images.unsplash.com/photo-1523050854058-8df90110c9f1");
+        background-size: cover;
+        background-position: center;
+        background-attachment: fixed;
+    }}
+    .stApp {{
+        background: rgba(255, 255, 255, 0.85);
+        border-radius: 20px;
+        padding: 20px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }}
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
-[data-testid="stHeader"] {
-  background: rgba(0,0,0,0);
-}
-
-.block-container {
-  background: rgba(255, 255, 255, 0.85);
-  padding: 2rem;
-  border-radius: 20px;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-}
-</style>
-"""
-st.markdown(page_bg_img, unsafe_allow_html=True)
-
-# 제목
 st.title("📚 시험 공부 계획 앱")
 st.write("시험 범위를 입력하면 **자동 분배 + 복습 일정 + 오늘 할 공부**까지 보여주는 앱입니다.")
 
@@ -39,11 +34,10 @@ st.write("시험 범위를 입력하면 **자동 분배 + 복습 일정 + 오늘
 # 유틸 함수
 # ==============================
 def parse_range(start, end):
-    """범위 문자열에서 숫자 추출"""
     try:
         start_num = int(''.join(filter(str.isdigit, start)))
         end_num = int(''.join(filter(str.isdigit, end)))
-        prefix = ''.join(filter(str.isalpha, start))  # p, 문제, 단원 등
+        prefix = ''.join(filter(str.isalpha, start))
         return start_num, end_num, prefix
     except:
         return None, None, ""
@@ -52,12 +46,10 @@ def parse_range(start, end):
 # 입력 영역
 # ==============================
 st.sidebar.header("시험 과목 & 교재 입력")
-
 num_subjects = st.sidebar.number_input("과목 수", min_value=1, max_value=10, value=2, step=1)
 daily_hours = st.sidebar.number_input("하루 공부 가능 시간 (시간)", min_value=1, max_value=12, value=6)
 
 subjects = []
-
 for i in range(num_subjects):
     with st.sidebar.expander(f"과목 {i+1} 입력"):
         subject = st.text_input(f"{i+1}번 과목명", key=f"sub_{i}")
@@ -90,7 +82,6 @@ if st.sidebar.button("📅 공부 계획 세우기") and subjects:
         days_left = (s["시험일"] - today).days
         if days_left <= 0:
             continue
-
         start_num, end_num, prefix = parse_range(s["범위시작"], s["범위끝"])
         if start_num and end_num:
             total_amount = end_num - start_num + 1
@@ -101,10 +92,9 @@ if st.sidebar.button("📅 공부 계획 세우기") and subjects:
                 current_date = today + timedelta(days=d)
                 part_start = start_num + d * daily_amount
                 part_end = part_start + daily_amount - 1
-                if d == days_left - 1:  # 마지막 날
+                if d == days_left - 1:
                     part_end = end_num
 
-                # 공부 일정
                 plan.append({
                     "날짜": current_date,
                     "과목": s["과목"],
@@ -116,7 +106,6 @@ if st.sidebar.button("📅 공부 계획 세우기") and subjects:
                     "예상시간(h)": round(daily_hours / num_subjects, 1)
                 })
 
-                # 복습 일정
                 for offset in [1, 3, 7]:
                     review_date = current_date + timedelta(days=offset)
                     if review_date <= s["시험일"]:
@@ -131,12 +120,9 @@ if st.sidebar.button("📅 공부 계획 세우기") and subjects:
                             "예상시간(h)": round(daily_hours / num_subjects / 2, 1)
                         })
 
-    # ==============================
-    # 결과 정리
-    # ==============================
     df = pd.DataFrame(plan).sort_values(["날짜", "과목"]).reset_index(drop=True)
 
-    # 오늘 공부
+    # 오늘 할 공부
     st.subheader("📌 오늘 할 공부")
     today_plan = df[df["날짜"] == today]
     if today_plan.empty:
@@ -152,18 +138,16 @@ if st.sidebar.button("📅 공부 계획 세우기") and subjects:
                 st.success("완료 ✅")
                 done_count += 1
         st.progress(done_count / len(today_plan))
+        if done_count == len(today_plan):
+            st.balloons()
 
-    # 달력 출력
+    # 달력
     st.subheader("📅 달력 계획")
-    unique_dates = df["날짜"].unique()
-    for d in unique_dates:
+    for d in df["날짜"].unique():
         day_tasks = df[df["날짜"] == d]
         st.markdown(f"### {d}")
         for _, t in day_tasks.iterrows():
-            if t["자료종류"] == "교과서":
-                color = "🔵"
-            else:
-                color = "🟡"
+            color = "🔵" if t["자료종류"] == "교과서" else "🟡"
             if "복습" in t["종류"]:
                 color = "🔴"
             st.write(f"{color} {t['과목']} - {t['자료종류']}({t['출판사']}) {t['단원']} - {t['범위']} ({t['종류']})")
@@ -171,10 +155,6 @@ if st.sidebar.button("📅 공부 계획 세우기") and subjects:
     # 전체 계획표
     st.subheader("📖 전체 계획표")
     st.dataframe(df, use_container_width=True)
-
-    # 공부 다 끝내면 축하
-    if not today_plan.empty and done_count == len(today_plan):
-        st.balloons()
 
 else:
     st.info("왼쪽에서 과목과 시험 범위를 입력하고 [📅 공부 계획 세우기] 버튼을 눌러주세요.")
